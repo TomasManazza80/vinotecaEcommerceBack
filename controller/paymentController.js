@@ -1,6 +1,10 @@
 const vexor = require('vexor');
 const dotenv = require('dotenv');
 
+const productService = require('../services/productService'); // Asegúrate de que la ruta sea correcta
+const paymentService = require('../payment/paymentService');
+console.log(paymentService);
+
 dotenv.config();
 const { Vexor } = vexor;
 
@@ -48,17 +52,15 @@ const createPayment = async (req, res) => {
   }
 };
 
+
+
 const handleWebhook = async (req, res) => {
   try {
     const webhookData = req.body;
-    console.log('Webhook recibido:', webhookData);
-    
-    // Solo registrar el webhook, no procesar productos
-    // Eliminada la llamada a paymentService.processWebhookData
-    
-    res.status(200).send('Webhook recibido correctamente');
+    await paymentService.processWebhookData(webhookData);
+    res.status(200).send('Webhook procesado correctamente');
   } catch (error) {
-    console.error('Error al procesar el webhook:', error);
+    console.error(error);
     res.status(500).send('Error al procesar el webhook');
   }
 };

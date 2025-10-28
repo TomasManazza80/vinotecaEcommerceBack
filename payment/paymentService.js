@@ -1,5 +1,6 @@
 const mercadopago = require('mercadopago');
-const axios = require('axios');
+const productService = require('../services/productService');
+console.log(productService);
 
 const createPreference = async (createPaymentDto, id) => {
   const client = {
