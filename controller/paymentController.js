@@ -1,6 +1,6 @@
 const vexor = require('vexor');
 const dotenv = require('dotenv');
-// ⚠️ Importar el service para delegar el procesamiento
+// ⚠️ Asegúrate de que esta ruta sea correcta:
 const paymentService = require('../payment/paymentService'); 
 
 dotenv.config();
@@ -50,15 +50,15 @@ const createPayment = async (req, res) => {
   }
 };
 
-
 const handleWebhook = async (req, res) => {
   try {
-    // 1. Usar Vexor para manejar la solicitud, validar y obtener el objeto de pago normalizado
+    // 1. Manejo del Webhook: Usamos try/catch y la instancia.
+    // 💡 Si el error persiste, la llamada a 'webhooks.handleWebhook' debe cambiarse 
+    // según la documentación oficial de Vexor. Esta es la estructura estándar.
     const vexorPayment = vexorInstance.webhooks.handleWebhook(req); 
 
     if (!vexorPayment) {
-        // Responder 200 si la webhook se recibió, pero Vexor determina que no es un evento procesable 
-        // o que se ha manejado internamente.
+        // Esto puede suceder si la webhook es de un evento que Vexor no necesita procesar (ej. notificación interna de MP)
         return res.status(200).send('Webhook recibido, no procesado por Vexor.');
     }
     
@@ -74,15 +74,11 @@ const handleWebhook = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error al procesar el webhook:', error.message);
+    // 💡 Importante: Si la falla es por `Cannot read properties of undefined (reading 'handleWebhook')` 
+    // significa que la inicialización de Vexor es incompleta.
+    console.error('Error al procesar el webhook:', error); 
     
-    // Si Vexor arroja un error (ej: firma inválida), se debe responder 401 o 400.
-    // Asumimos un nombre de error estándar para Vexor.
-    if (error.name === 'VexorWebhookError') {
-         return res.status(401).send('Firma de Webhook no válida.');
-    }
-    
-    // Error interno del servidor
+    // Usamos 500 para errores internos, pero 200 si es un evento que no se procesa (MP reintenta con 500)
     res.status(500).send('Error al procesar el webhook');
   }
 };

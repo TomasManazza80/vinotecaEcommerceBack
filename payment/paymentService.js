@@ -34,8 +34,6 @@ const createPreference = async (createPaymentDto, id) => {
   }
 };
 
-// ⚠️ Función Obsoleta, ya no se usa directamente desde el controlador con Vexor. 
-// La dejamos, pero la nueva lógica la reemplaza.
 const processWebhookData = async (webhookData) => {
   if (webhookData.data.product) {
     const productId = webhookData.data.product.id;
@@ -48,13 +46,13 @@ const processWebhookData = async (webhookData) => {
 };
 
 /**
- * Nueva función para procesar el objeto de pago normalizado por Vexor.
+ * Función CLAVE para VEXOR: Procesa el objeto de pago normalizado.
  * @param {object} vexorPayment - Objeto de pago normalizado de Vexor.
  */
 const processVexorWebhook = async (vexorPayment) => {
     // Vexor normaliza el estado del pago (approved, pending, rejected, etc.)
     const status = vexorPayment.status;
-    // Vexor te debería dar el ID de tu orden interna
+    // Usamos 'externalId' o 'orderId' que Vexor debería mantener de tu referencia externa
     const orderId = vexorPayment.externalId || vexorPayment.orderId; 
     
     console.log(`--- Procesando Pago Vexor ---`);
@@ -63,16 +61,17 @@ const processVexorWebhook = async (vexorPayment) => {
     switch (status) {
         case 'approved':
             console.log(`✅ PAGO APROBADO. Actualizando orden ${orderId} en tu BD.`);
-            // Aquí iría la lógica para actualizar el estado en tu base de datos
-            // y posiblemente llamar a la función 'success' si es necesario
-            // await success(vexorPayment); 
+            // Lógica: Actualizar estado de la orden a 'Pagado'.
+            await success(vexorPayment); // Llamar a tu función 'success' si es necesario
             break;
         case 'pending':
             console.log(`⏳ PAGO PENDIENTE. La orden ${orderId} sigue en espera.`);
+            // Lógica: Mantener estado en 'Pendiente de Pago'.
             break;
         case 'rejected':
         case 'failed':
             console.log(`❌ PAGO RECHAZADO/FALLIDO. Cancelando orden ${orderId}.`);
+            // Lógica: Actualizar estado de la orden a 'Cancelado/Fallido'.
             break;
         default:
             console.log(`❓ Estatus desconocido (${status}) para orden ${orderId}.`);
@@ -85,12 +84,17 @@ const processVexorWebhook = async (vexorPayment) => {
 
 const success = async (webhookData) => {
   const url = 'https://vineriabaco.com/';
-  // ⚠️ La estructura de datos aquí está diseñada para un webhook directo de MP. 
-  // Si usas Vexor, deberías adaptar 'data' para usar la estructura de 'vexorPayment'
+  // ⚠️ Esta estructura debería adaptarse al objeto normalizado de Vexor
   const data = {
     id: webhookData.id,
     type: webhookData.type,
-    // ... adaptar al objeto normalizado de Vexor
+    // ... otros campos adaptados de 'vexorPayment'
+    data: {
+      id: webhookData.id, 
+      status: webhookData.status, // Usar el campo normalizado
+      amount: webhookData.amount, // Usar el campo normalizado
+      // ... otros datos necesarios
+    }
   };
 
   try {
@@ -103,7 +107,7 @@ const success = async (webhookData) => {
 
 module.exports = {
   createPreference,
-  processWebhookData, // Se mantiene, pero es reemplazada por Vexor
-  processVexorWebhook, // 👈 Función clave para Vexor
+  processWebhookData, 
+  processVexorWebhook, // 👈 Función que usa el Controller
   success
 };
