@@ -1,9 +1,10 @@
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 
 const client = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN, // ⚠️ usa variable de entorno
+  accessToken: process.env.MP_ACCESS_TOKEN, // ⚠️ usa tu Access Token real en .env
 });
 
+// Crear preferencia de pago
 const createPreference = async (createPaymentDto, id) => {
   const preference = new Preference(client);
 
@@ -25,16 +26,21 @@ const createPreference = async (createPaymentDto, id) => {
     external_reference: id,
   };
 
-  const result = await preference.create({ body: preferenceData });
-  return result; // contiene init_point
+  try {
+    const result = await preference.create({ body: preferenceData });
+    return result; // contiene init_point y sandbox_init_point
+  } catch (error) {
+    throw error;
+  }
 };
 
+// Procesar webhook de Mercado Pago
 const processWebhookData = async (webhookData) => {
   try {
-    const paymentId = webhookData.data.id; // viene del body del webhook
+    const paymentId = webhookData.data.id; // ID del pago
     const payment = new Payment(client);
 
-    const result = await payment.get({ id: paymentId }); // ✅ método correcto
+    const result = await payment.get({ id: paymentId });
 
     console.log('Pago consultado:', result);
 

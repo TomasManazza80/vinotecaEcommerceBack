@@ -1,7 +1,4 @@
-const dotenv = require('dotenv');
 const paymentService = require('../payment/paymentService');
-
-dotenv.config();
 
 const createPayment = async (req, res) => {
   const { product } = req.body;
@@ -25,8 +22,7 @@ const createPayment = async (req, res) => {
 
 const handleWebhook = async (req, res) => {
   try {
-    const webhookData = req.body; // Mercado Pago envía JSON en el body
-
+    const webhookData = req.body;
     console.log('Webhook recibido:', webhookData);
 
     const result = await paymentService.processWebhookData(webhookData);
