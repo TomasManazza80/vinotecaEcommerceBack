@@ -25,7 +25,10 @@ const createPayment = async (req, res) => {
 
 const handleWebhook = async (req, res) => {
   try {
-    const webhookData = req.body;
+    const webhookData = req.body; // Mercado Pago envía JSON en el body
+
+    console.log('Webhook recibido:', webhookData);
+
     const result = await paymentService.processWebhookData(webhookData);
 
     res.status(200).json({
@@ -33,7 +36,7 @@ const handleWebhook = async (req, res) => {
       status: result.newStatus,
     });
   } catch (error) {
-    console.error('Error al procesar webhook:', error);
+    console.error('Error al procesar el webhook:', error);
     res.status(500).send('Error al procesar el webhook');
   }
 };
