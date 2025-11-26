@@ -3,7 +3,7 @@ const axios = require('axios');
 
 const createPreference = async (createPaymentDto, id) => {
   const client = {
-    access_token: 'APP_USR-8101026874292077-101721-08438cf8d2ed21fe5947641f4ae99cd8-2015493826',
+    access_token:"APP_USR-7009057186810051-112615-608007d836258edbf1abad926e0aa1c6-632503296", // ⚠️ Usa variable de entorno
   };
 
   mercadopago.configure(client);
@@ -34,80 +34,40 @@ const createPreference = async (createPaymentDto, id) => {
   }
 };
 
+// Procesa el webhook directamente de Mercado Pago
 const processWebhookData = async (webhookData) => {
-  if (webhookData.data.product) {
-    const productId = webhookData.data.product.id;
-    const quantity = webhookData.data.product.quantity;
-    // Debes tener la dependencia de productService para que esto funcione
-    // await productService.updateQuantityProduct(productId, quantity); 
-  } else {
-    console.error('No se encontró información de producto en el webhook');
-  }
-};
-
-/**
- * Función CLAVE para VEXOR: Procesa el objeto de pago normalizado.
- * @param {object} vexorPayment - Objeto de pago normalizado de Vexor.
- */
-const processVexorWebhook = async (vexorPayment) => {
-    // Vexor normaliza el estado del pago (approved, pending, rejected, etc.)
-    const status = vexorPayment.status;
-    // Usamos 'externalId' o 'orderId' que Vexor debería mantener de tu referencia externa
-    const orderId = vexorPayment.externalId || vexorPayment.orderId; 
-    
-    console.log(`--- Procesando Pago Vexor ---`);
-    console.log(`Estado: ${status}, ID de Orden Interna: ${orderId}`);
-
-    switch (status) {
-        case 'approved':
-            console.log(`✅ PAGO APROBADO. Actualizando orden ${orderId} en tu BD.`);
-            // Lógica: Actualizar estado de la orden a 'Pagado'.
-            await success(vexorPayment); // Llamar a tu función 'success' si es necesario
-            break;
-        case 'pending':
-            console.log(`⏳ PAGO PENDIENTE. La orden ${orderId} sigue en espera.`);
-            // Lógica: Mantener estado en 'Pendiente de Pago'.
-            break;
-        case 'rejected':
-        case 'failed':
-            console.log(`❌ PAGO RECHAZADO/FALLIDO. Cancelando orden ${orderId}.`);
-            // Lógica: Actualizar estado de la orden a 'Cancelado/Fallido'.
-            break;
-        default:
-            console.log(`❓ Estatus desconocido (${status}) para orden ${orderId}.`);
-            break;
-    }
-    
-    return { success: true, newStatus: status };
-};
-
-
-const success = async (webhookData) => {
-  const url = 'https://vineriabaco.com/';
-  // ⚠️ Esta estructura debería adaptarse al objeto normalizado de Vexor
-  const data = {
-    id: webhookData.id,
-    type: webhookData.type,
-    // ... otros campos adaptados de 'vexorPayment'
-    data: {
-      id: webhookData.id, 
-      status: webhookData.status, // Usar el campo normalizado
-      amount: webhookData.amount, // Usar el campo normalizado
-      // ... otros datos necesarios
-    }
-  };
-
   try {
-    const response = await axios.post(url, data);
-    console.log('Pago exitoso. Respuesta:', response.data);
+    const paymentId = webhookData.data.id;
+
+    // Consultar el pago en Mercado Pago
+    const payment = await mercadopago.payment.findById(paymentId);
+
+    console.log('Webhook recibido:', payment.body);
+
+    switch (payment.body.status) {
+      case 'approved':
+        console.log(`✅ Pago aprobado. Actualizar orden ${payment.body.external_reference}`);
+        // Lógica de negocio: actualizar orden en BD
+        break;
+      case 'pending':
+        console.log(`⏳ Pago pendiente. Orden ${payment.body.external_reference}`);
+        break;
+      case 'rejected':
+        console.log(`❌ Pago rechazado. Orden ${payment.body.external_reference}`);
+        break;
+      default:
+        console.log(`❓ Estado desconocido: ${payment.body.status}`);
+        break;
+    }
+
+    return { success: true, newStatus: payment.body.status };
   } catch (error) {
-    console.error('Error al enviar pago exitoso:', error);
+    console.error('Error al procesar webhook:', error);
+    throw error;
   }
 };
 
 module.exports = {
   createPreference,
-  processWebhookData, 
-  processVexorWebhook, // 👈 Función que usa el Controller
-  success
+  processWebhookData,
 };
