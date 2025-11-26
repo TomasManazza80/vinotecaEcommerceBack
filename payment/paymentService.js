@@ -1,12 +1,11 @@
-const mercadopago = require('mercadopago');
-const axios = require('axios');
+const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+
+const client = new MercadoPagoConfig({
+  accessToken: "APP_USR-7009057186810051-112615-608007d836258edbf1abad926e0aa1c6-63250329", // ⚠️ usa variable de entorno
+});
 
 const createPreference = async (createPaymentDto, id) => {
-  const client = {
-    access_token:"APP_USR-7009057186810051-112615-608007d836258edbf1abad926e0aa1c6-632503296", // ⚠️ Usa variable de entorno
-  };
-
-  mercadopago.configure(client);
+  const preference = new Preference(client);
 
   const preferenceData = {
     items: [
@@ -26,41 +25,35 @@ const createPreference = async (createPaymentDto, id) => {
     external_reference: id,
   };
 
-  try {
-    const preference = await mercadopago.preferences.create(preferenceData);
-    return preference.body;
-  } catch (error) {
-    throw error;
-  }
+  const result = await preference.create({ body: preferenceData });
+  return result; // contiene init_point
 };
 
-// Procesa el webhook directamente de Mercado Pago
 const processWebhookData = async (webhookData) => {
   try {
-    const paymentId = webhookData.data.id;
+    const paymentId = webhookData.data.id; // viene del body del webhook
+    const payment = new Payment(client);
 
-    // Consultar el pago en Mercado Pago
-    const payment = await mercadopago.payment.findById(paymentId);
+    const result = await payment.get({ id: paymentId }); // ✅ método correcto
 
-    console.log('Webhook recibido:', payment.body);
+    console.log('Pago consultado:', result);
 
-    switch (payment.body.status) {
+    switch (result.status) {
       case 'approved':
-        console.log(`✅ Pago aprobado. Actualizar orden ${payment.body.external_reference}`);
-        // Lógica de negocio: actualizar orden en BD
+        console.log(`✅ Pago aprobado. Orden ${result.external_reference}`);
         break;
       case 'pending':
-        console.log(`⏳ Pago pendiente. Orden ${payment.body.external_reference}`);
+        console.log(`⏳ Pago pendiente. Orden ${result.external_reference}`);
         break;
       case 'rejected':
-        console.log(`❌ Pago rechazado. Orden ${payment.body.external_reference}`);
+        console.log(`❌ Pago rechazado. Orden ${result.external_reference}`);
         break;
       default:
-        console.log(`❓ Estado desconocido: ${payment.body.status}`);
+        console.log(`❓ Estado desconocido: ${result.status}`);
         break;
     }
 
-    return { success: true, newStatus: payment.body.status };
+    return { success: true, newStatus: result.status };
   } catch (error) {
     console.error('Error al procesar webhook:', error);
     throw error;
