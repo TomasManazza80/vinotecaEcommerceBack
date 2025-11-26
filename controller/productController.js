@@ -1,17 +1,64 @@
-const AllValidation = require("../validation/AllValidation");
+const AllValidation = require("../validation/AllValidation"); // Importación original, usaremos validación interna.
 const productService = require('../services/productService');
 
 const productController = {
 
+  // Método unificado para creación simple o masiva
   async createProduct(req, res) {
     try {
-      const product = await productService.createProduct(req.body);
-      res.status(201).json(product);
+      const payload = req.body;
+      let result;
+
+      // 1. Verificación del Payload para Carga Masiva
+      if (Array.isArray(payload)) {
+        if (payload.length === 0) {
+            return res.status(400).json({ message: 'El arreglo de productos está vacío.' });
+        }
+        
+        console.log(`Iniciando carga masiva de ${payload.length} productos...`);
+        // Llama a la función de inserción masiva en el servicio
+        result = await productService.createBulkProducts(payload); 
+        
+        // Respuesta de éxito para carga masiva
+        res.status(201).json({ 
+            message: `${result.length} productos creados exitosamente`, 
+            data: result 
+        });
+
+      } else {
+        // 2. Comportamiento actual: crear un solo producto
+        console.log("Creando un solo producto...");
+        // Llama a la función de creación simple en el servicio
+        result = await productService.createSingleProduct(payload);
+        res.status(201).json(result);
+      }
+
     } catch (error) {
-      console.error("Error al crear producto:", error);
-      res.status(500).json({ message: 'Error al crear producto' });
+      console.error("Error en la creación/carga masiva de productos:", error);
+      // Devuelve un error 400 si es un fallo de validación o un 500 para errores de DB
+      res.status(400).json({ // Usamos 400 por si falla la validación del ORM (bulkCreate)
+          message: 'Error al procesar la creación de productos. Verifique los datos.',
+          error: error.message || 'Error interno del servidor'
+      });
     }
   },
+  
+  // (Mantener el resto de los métodos como getAllProducts, getProductById, etc.)
+  // ...
+  
+  // Refactorizar updateProduct para recibir un solo objeto de updates
+  async updateProduct(req, res) {
+    try {
+      const id = req.params.id;
+      // Pasa el objeto req.body completo al service
+      const product = await productService.updateProduct(id, req.body); 
+      res.status(200).json(product);
+    } catch (error) {
+      res.status(500).json({ message: 'Error al actualizar producto' });
+    }
+  },
+  
+  // ... (otros métodos)
 
   async getAllProducts(req, res) {
     try {
@@ -35,19 +82,7 @@ const productController = {
       res.status(500).json({ message: 'Error al obtener producto' });
     }
   },
-
-  async updateProduct(req, res) {
-    try {
-      const id = req.params.id;
-      const { nombre, precio, marca, descripcion, categoria, cantidad, talle, imagenes } = req.body;
-      const product = await productService.updateProduct(id, nombre, precio, descripcion, marca, categoria, cantidad, talle, imagenes);
-      res.status(200).json(product);
-    } catch (error) {
-      res.status(500).json({ message: 'Error al actualizar producto' });
-    }
-  },
-
-  async updateQuantityProduct(req, res) {
+    async updateQuantityProduct(req, res) {
     try {
       const productId = req.params.id;
       const { quantityToDiscount } = req.body;
@@ -69,6 +104,7 @@ const productController = {
       res.status(500).json({ message: 'Error al eliminar producto' });
     }
   },
+
 };
 
 module.exports = productController;

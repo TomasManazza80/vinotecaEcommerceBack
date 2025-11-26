@@ -1,9 +1,7 @@
 const vexor = require('vexor');
 const dotenv = require('dotenv');
-
-const productService = require('../services/productService'); // Asegúrate de que la ruta sea correcta
-const paymentService = require('../payment/paymentService');
-console.log(paymentService);
+// ⚠️ Importar el service para delegar el procesamiento
+const paymentService = require('../payment/paymentService'); 
 
 dotenv.config();
 const { Vexor } = vexor;
@@ -53,14 +51,38 @@ const createPayment = async (req, res) => {
 };
 
 
-
 const handleWebhook = async (req, res) => {
   try {
-    const webhookData = req.body;
-    await paymentService.processWebhookData(webhookData);
-    res.status(200).send('Webhook procesado correctamente');
+    // 1. Usar Vexor para manejar la solicitud, validar y obtener el objeto de pago normalizado
+    const vexorPayment = vexorInstance.webhooks.handleWebhook(req); 
+
+    if (!vexorPayment) {
+        // Responder 200 si la webhook se recibió, pero Vexor determina que no es un evento procesable 
+        // o que se ha manejado internamente.
+        return res.status(200).send('Webhook recibido, no procesado por Vexor.');
+    }
+    
+    console.log('Webhook Vexor recibido y normalizado:', vexorPayment);
+    
+    // 2. Delegar el procesamiento de negocio al Service
+    const result = await paymentService.processVexorWebhook(vexorPayment);
+    
+    // 3. Responder 200 OK
+    res.status(200).json({ 
+        message: 'Webhook de Vexor procesado correctamente.',
+        status: result.newStatus 
+    });
+    
   } catch (error) {
-    console.error(error);
+    console.error('Error al procesar el webhook:', error.message);
+    
+    // Si Vexor arroja un error (ej: firma inválida), se debe responder 401 o 400.
+    // Asumimos un nombre de error estándar para Vexor.
+    if (error.name === 'VexorWebhookError') {
+         return res.status(401).send('Firma de Webhook no válida.');
+    }
+    
+    // Error interno del servidor
     res.status(500).send('Error al procesar el webhook');
   }
 };

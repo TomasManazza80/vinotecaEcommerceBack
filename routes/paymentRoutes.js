@@ -1,4 +1,4 @@
-// routes/paymentRoutes.js
+// routes/paymentRoutes.js (SIN CAMBIOS)
 
 const express = require('express');
 const paymentController = require('../controller/paymentController.js');

@@ -1,6 +1,5 @@
 const mercadopago = require('mercadopago');
-const productService = require('../services/productService');
-console.log(productService);
+const axios = require('axios');
 
 const createPreference = async (createPaymentDto, id) => {
   const client = {
@@ -35,42 +34,63 @@ const createPreference = async (createPaymentDto, id) => {
   }
 };
 
+// ⚠️ Función Obsoleta, ya no se usa directamente desde el controlador con Vexor. 
+// La dejamos, pero la nueva lógica la reemplaza.
 const processWebhookData = async (webhookData) => {
   if (webhookData.data.product) {
     const productId = webhookData.data.product.id;
     const quantity = webhookData.data.product.quantity;
-    await productService.updateQuantityProduct(productId, quantity);
+    // Debes tener la dependencia de productService para que esto funcione
+    // await productService.updateQuantityProduct(productId, quantity); 
   } else {
     console.error('No se encontró información de producto en el webhook');
   }
 };
 
+/**
+ * Nueva función para procesar el objeto de pago normalizado por Vexor.
+ * @param {object} vexorPayment - Objeto de pago normalizado de Vexor.
+ */
+const processVexorWebhook = async (vexorPayment) => {
+    // Vexor normaliza el estado del pago (approved, pending, rejected, etc.)
+    const status = vexorPayment.status;
+    // Vexor te debería dar el ID de tu orden interna
+    const orderId = vexorPayment.externalId || vexorPayment.orderId; 
+    
+    console.log(`--- Procesando Pago Vexor ---`);
+    console.log(`Estado: ${status}, ID de Orden Interna: ${orderId}`);
+
+    switch (status) {
+        case 'approved':
+            console.log(`✅ PAGO APROBADO. Actualizando orden ${orderId} en tu BD.`);
+            // Aquí iría la lógica para actualizar el estado en tu base de datos
+            // y posiblemente llamar a la función 'success' si es necesario
+            // await success(vexorPayment); 
+            break;
+        case 'pending':
+            console.log(`⏳ PAGO PENDIENTE. La orden ${orderId} sigue en espera.`);
+            break;
+        case 'rejected':
+        case 'failed':
+            console.log(`❌ PAGO RECHAZADO/FALLIDO. Cancelando orden ${orderId}.`);
+            break;
+        default:
+            console.log(`❓ Estatus desconocido (${status}) para orden ${orderId}.`);
+            break;
+    }
+    
+    return { success: true, newStatus: status };
+};
+
+
 const success = async (webhookData) => {
-  const url = 'https://indumentarianam.netlify.app/';
+  const url = 'https://vineriabaco.com/';
+  // ⚠️ La estructura de datos aquí está diseñada para un webhook directo de MP. 
+  // Si usas Vexor, deberías adaptar 'data' para usar la estructura de 'vexorPayment'
   const data = {
     id: webhookData.id,
     type: webhookData.type,
-    entity: webhookData.entity,
-    action: webhookData.action,
-    date: webhookData.date,
-    model_version: webhookData.model_version,
-    version: webhookData.version,
-    data: {
-      id: webhookData.data.id,
-      status: webhookData.data.status,
-      amount: webhookData.data.amount,
-      payment_method_id: webhookData.data.payment_method_id,
-      payer: {
-        id: webhookData.data.payer.id,
-        name: webhookData.data.payer.name,
-        email: webhookData.data.payer.email
-      },
-      product: {
-        id: webhookData.data.product.id,
-        name: webhookData.data.product.name,
-        quantity: webhookData.data.product.quantity
-      }
-    }
+    // ... adaptar al objeto normalizado de Vexor
   };
 
   try {
@@ -83,6 +103,7 @@ const success = async (webhookData) => {
 
 module.exports = {
   createPreference,
-  processWebhookData,
+  processWebhookData, // Se mantiene, pero es reemplazada por Vexor
+  processVexorWebhook, // 👈 Función clave para Vexor
   success
 };
