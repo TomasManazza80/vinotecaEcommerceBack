@@ -1,12 +1,12 @@
-const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+const mercadopago = require('mercadopago');
+const axios = require('axios');
 
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN, // ⚠️ usa tu Access Token real en .env
-});
-
-// Crear preferencia de pago
 const createPreference = async (createPaymentDto, id) => {
-  const preference = new Preference(client);
+  const client = {
+    access_token: 'APP_USR-8101026874292077-101721-08438cf8d2ed21fe5947641f4ae99cd8-2015493826',
+  };
+
+  mercadopago.configure(client);
 
   const preferenceData = {
     items: [
@@ -27,46 +27,61 @@ const createPreference = async (createPaymentDto, id) => {
   };
 
   try {
-    const result = await preference.create({ body: preferenceData });
-    return result; // contiene init_point y sandbox_init_point
+    const preference = await mercadopago.preferences.create(preferenceData);
+    return preference.body;
   } catch (error) {
     throw error;
   }
 };
 
-// Procesar webhook de Mercado Pago
 const processWebhookData = async (webhookData) => {
-  try {
-    const paymentId = webhookData.data.id; // ID del pago
-    const payment = new Payment(client);
+  if (webhookData.data.product) {
+    const productId = webhookData.data.product.id;
+    const quantity = webhookData.data.product.quantity;
+    await productService.updateQuantityProduct(productId, quantity);
+  } else {
+    console.error('No se encontró información de producto en el webhook');
+  }
+};
 
-    const result = await payment.get({ id: paymentId });
-
-    console.log('Pago consultado:', result);
-
-    switch (result.status) {
-      case 'approved':
-        console.log(`✅ Pago aprobado. Orden ${result.external_reference}`);
-        break;
-      case 'pending':
-        console.log(`⏳ Pago pendiente. Orden ${result.external_reference}`);
-        break;
-      case 'rejected':
-        console.log(`❌ Pago rechazado. Orden ${result.external_reference}`);
-        break;
-      default:
-        console.log(`❓ Estado desconocido: ${result.status}`);
-        break;
+const success = async (webhookData) => {
+  const url = 'https://indumentarianam.netlify.app/';
+  const data = {
+    id: webhookData.id,
+    type: webhookData.type,
+    entity: webhookData.entity,
+    action: webhookData.action,
+    date: webhookData.date,
+    model_version: webhookData.model_version,
+    version: webhookData.version,
+    data: {
+      id: webhookData.data.id,
+      status: webhookData.data.status,
+      amount: webhookData.data.amount,
+      payment_method_id: webhookData.data.payment_method_id,
+      payer: {
+        id: webhookData.data.payer.id,
+        name: webhookData.data.payer.name,
+        email: webhookData.data.payer.email
+      },
+      product: {
+        id: webhookData.data.product.id,
+        name: webhookData.data.product.name,
+        quantity: webhookData.data.product.quantity
+      }
     }
+  };
 
-    return { success: true, newStatus: result.status };
+  try {
+    const response = await axios.post(url, data);
+    console.log('Pago exitoso. Respuesta:', response.data);
   } catch (error) {
-    console.error('Error al procesar webhook:', error);
-    throw error;
+    console.error('Error al enviar pago exitoso:', error);
   }
 };
 
 module.exports = {
   createPreference,
   processWebhookData,
+  success
 };

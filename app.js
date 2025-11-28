@@ -1,71 +1,84 @@
-var dotenv = require('dotenv');
+// BACK/app.js (versión ES Modules - Exporta 'app')
+
+import dotenv from 'dotenv';
+import createError from 'http-errors';
+import express from 'express';
+import path from 'path';
+import cookieParser from 'cookie-parser';
+import logger from 'morgan';
+import cors from 'cors';
+
+// Rutas
+import indexRouter from './routes/index.js';
+import usersRouter from './routes/users.js';
+import productRouter from './routes/product.js';
+import reparacionesRouter from './routes/reparacionesRoutes.js';
+import paymentRouter from './routes/paymentRoutes.js';
+import productBought from './routes/productBoughtRoute.js';
+import recaudationRouter from './routes/recaudationRoutes.js';
+import pagoCaja from './routes/pagoCajaRoutes.js';
+import recaudacionFinalRouter from './routes/recaudacionFinalRoutes.js';
+
+// Vexor: CORRECCIÓN FINAL DE IMPORTACIÓN
+// Esto resuelve: TypeError: Vexor is not a constructor
+import vexorModule from 'vexor'; 
+
+// La clase Vexor se extrae con una lógica de respaldo: 
+// 1. Intentamos acceder a .Vexor (como en el ejemplo CommonJS) 
+// 2. Si no es .Vexor, asumimos que la clase es la exportación por defecto (vexorModule).
+const Vexor = vexorModule.Vexor || vexorModule.default || vexorModule;
+
 dotenv.config();
 
-var createError = require("http-errors");
-var express = require("express");
-var path = require("path");
-var cookieParser = require("cookie-parser");
-var logger = require("morgan");
-var cors = require("cors");
-var indexRouter = require("./routes/index");
-var usersRouter = require("./routes/users");
-var productRouter = require("./routes/product");
-var paymentRouter = require("./routes/paymentRoutes");  // Agregar esta línea
-var vexor = require("vexor");
-const productBought = require("./routes/productBoughtRoute");
-var recaudationRouter = require("./routes/recaudationRoutes");
-const { Vexor } = vexor;
+// Para ES Modules (equivalente a __dirname)
+// Nota: path.dirname(new URL(import.meta.url).pathname) requiere el protocolo 'file://'
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
+const app = express();
 
-
-
-
-
-var app = express();
-const PORT = 3000;
+// Instancia Vexor
 const vexorInstance = new Vexor({
-  publishableKey: process.env.VEXOR_PUBLISHABLE_KEY,
-  projectId: process.env.VEXOR_PROJECT_ID,
-  apiKey: process.env.VEXOR_API_KEY,
+  publishableKey: process.env.VEXOR_PUBLISHABLE_KEY,
+  projectId: process.env.VEXOR_PROJECT_ID,
+  apiKey: process.env.VEXOR_API_KEY,
 });
 
-
+// Settings
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
-
-
-
-
-app.use(logger("dev"));
+// Middlewares
+app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
-app.use(`/`, indexRouter);
-app.use(`/`, usersRouter);
-app.use(`/`, productRouter);
-app.use(`/payment`, paymentRouter);
-app.use(`/boughtProduct`, productBought);
-app.use(`/recaudation`, recaudationRouter);
+// Rutas
+app.use('/', indexRouter);
+app.use('/', usersRouter);
+app.use('/', productRouter);
+app.use('/payment', paymentRouter);
+app.use('/boughtProduct', productBought);
+app.use('/recaudation', recaudationRouter);
+app.use('/reparaciones', reparacionesRouter);
+app.use('/pagoCaja', pagoCaja);
+app.use('/recaudacionFinal', recaudacionFinalRouter);
 
-// catch 404 and forward to error handler
-app.use(function (req, res, next) {
-  next(createError(404));
+// Catch 404
+app.use((req, res, next) => {
+  next(createError(404));
 });
 
-// error handler
-app.use(function (err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get("env") === "development" ? err : {};
+// Error handler
+app.use((err, req, res, next) => {
+  res.locals.message = err.message;
+  res.locals.error = req.app.get('env') === 'development' ? err : {};
 
-
-  // render the error page
-  res.status(err.status || 500);
-  res.render("error");
+  res.status(err.status || 500);
+  res.render('error');
 });
 
-module.exports = app;
+// Exporta la aplicación para que el script 'www.js' pueda importarla y arrancar el servidor.
+export default app;
