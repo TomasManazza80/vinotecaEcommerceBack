@@ -18,6 +18,11 @@ import productBought from './routes/productBoughtRoute.js';
 import recaudationRouter from './routes/recaudationRoutes.js';
 import pagoCaja from './routes/pagoCajaRoutes.js';
 import recaudacionFinalRouter from './routes/recaudacionFinalRoutes.js';
+import costosEnvioRouter from './routes/costosEnvioRoutes.js';
+import costoTargetasRouter from './routes/costoTargetasRoutes.js';
+import globalSettingsRouter from './routes/costosGlobalesRoutes.js';
+
+
 
 // Vexor: CORRECCIÓN FINAL DE IMPORTACIÓN
 // Esto resuelve: TypeError: Vexor is not a constructor
@@ -65,6 +70,9 @@ app.use('/recaudation', recaudationRouter);
 app.use('/reparaciones', reparacionesRouter);
 app.use('/pagoCaja', pagoCaja);
 app.use('/recaudacionFinal', recaudacionFinalRouter);
+app.use('/costosEnvio', costosEnvioRouter);
+app.use('/costoTargetas', costoTargetasRouter);
+app.use('/globalSettings', globalSettingsRouter);
 
 // Catch 404
 app.use((req, res, next) => {
