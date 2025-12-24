@@ -7,6 +7,8 @@ import path from 'path';
 import cookieParser from 'cookie-parser';
 import logger from 'morgan';
 import cors from 'cors';
+import whatsappEnvioRoutes from './routes/whatsapp/enviarMensajeWhatsapp.js';
+import qrRoutes from './routes/QRroutes/qrRoutes.js';
 
 // Rutas
 import indexRouter from './routes/index.js';
@@ -26,7 +28,7 @@ import globalSettingsRouter from './routes/costosGlobalesRoutes.js';
 
 // Vexor: CORRECCIÓN FINAL DE IMPORTACIÓN
 // Esto resuelve: TypeError: Vexor is not a constructor
-import vexorModule from 'vexor'; 
+import vexorModule from 'vexor';
 
 // La clase Vexor se extrae con una lógica de respaldo: 
 // 1. Intentamos acceder a .Vexor (como en el ejemplo CommonJS) 
@@ -43,9 +45,9 @@ const app = express();
 
 // Instancia Vexor
 const vexorInstance = new Vexor({
-  publishableKey: process.env.VEXOR_PUBLISHABLE_KEY,
-  projectId: process.env.VEXOR_PROJECT_ID,
-  apiKey: process.env.VEXOR_API_KEY,
+    publishableKey: process.env.VEXOR_PUBLISHABLE_KEY,
+    projectId: process.env.VEXOR_PROJECT_ID,
+    apiKey: process.env.VEXOR_API_KEY,
 });
 
 // Settings
@@ -73,19 +75,21 @@ app.use('/recaudacionFinal', recaudacionFinalRouter);
 app.use('/costosEnvio', costosEnvioRouter);
 app.use('/costoTargetas', costoTargetasRouter);
 app.use('/globalSettings', globalSettingsRouter);
+app.use('/whatsappEnvio', whatsappEnvioRoutes);
+app.use('/qr', qrRoutes);
 
 // Catch 404
 app.use((req, res, next) => {
-  next(createError(404));
+    next(createError(404));
 });
 
 // Error handler
 app.use((err, req, res, next) => {
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
+    res.locals.message = err.message;
+    res.locals.error = req.app.get('env') === 'development' ? err : {};
 
-  res.status(err.status || 500);
-  res.render('error');
+    res.status(err.status || 500);
+    res.render('error');
 });
 
 // Exporta la aplicación para que el script 'www.js' pueda importarla y arrancar el servidor.

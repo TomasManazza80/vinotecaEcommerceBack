@@ -12,11 +12,11 @@ const pagoService = {
         console.log("Creando un nuevo pago...");
         try {
             // Usamos la variable 'PagoProducto' importada directamente.
-            const pago = await PagoProducto.create(data); 
+            const pago = await PagoProducto.create(data);
             return pago;
         } catch (error) {
             console.error('Error al crear el pago:', error);
-            throw error; 
+            throw error;
         }
     },
 
@@ -65,7 +65,7 @@ const pagoService = {
                 throw new Error('Pago no encontrado');
             }
             // Actualiza el registro con los nuevos datos
-            await pago.update(updates); 
+            await pago.update(updates);
             return pago;
         } catch (error) {
             console.error(`Error al actualizar el pago con ID ${id}:`, error);
