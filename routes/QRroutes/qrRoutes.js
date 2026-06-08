@@ -1,11 +1,9 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const whatsappController = require('../../controller/QrController/QrController');
+import * as whatsappController from '../../controller/QrController/QrController.js';
 
-// Línea 6
 router.get('/status', whatsappController.getWhatsappStatus);
-
-// Línea 7 - REVISA QUE ESTO NO SEA UNDEFINED
 router.post('/restart', whatsappController.restartWhatsapp);
+router.post('/send-message', whatsappController.sendWhatsappMessage);
 
-module.exports = router;
+export default router;

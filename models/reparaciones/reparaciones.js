@@ -1,94 +1,93 @@
 const { DataTypes } = require("sequelize");
 
-// Asume que esta constante se importa desde tu archivo de configuración de base de datos
-// const Sequelize = require("../../dbconnection/db"); 
-// Usamos una variable placeholder 'db' para el ejemplo.
-
-// NOTA: Reemplaza 'db' con tu objeto de conexión Sequelize importado si es diferente.
-const Reparacion = (db) => db.define(
-    "Reparacion",
+const reparacion = (db) => db.define(
+    "reparacion",
     {
-        // El ID de reparación (primary key autoincremental)
         id: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
             primaryKey: true,
         },
-        // Información del Cliente
-        nombreDueno: { // Mapea a nombre_dueno en PostgreSQL
-            type: DataTypes.STRING(255),
+        numeroOrden: {
+            type: DataTypes.STRING(100),
             allowNull: false,
+            unique: true,
+        },
+        fechaIngreso: {
+            type: DataTypes.DATEONLY,
+            defaultValue: DataTypes.NOW,
+        },
+        tecnicoResponsable: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+        },
+        nombreDueno: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+        },
+        dni: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
         },
         celular: {
             type: DataTypes.STRING(50),
-            allowNull: false,
+            allowNull: true,
         },
         direccion: {
             type: DataTypes.STRING(255),
             allowNull: true,
         },
-        
-        // Información del Dispositivo y Servicio
-        nombreDispositivo: { // Mapea a nombre_dispositivo
+        modeloEquipo: {
             type: DataTypes.STRING(255),
-            allowNull: false,
+            allowNull: true,
         },
-        montoAPagar: { // Mapea a monto_a_pagar
-            type: DataTypes.DECIMAL(10, 2),
-            allowNull: false,
-            defaultValue: 0.00,
+        numeroSerie: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
         },
-        descripcionProblema: { // Mapea a descripcion_problema
-            type: DataTypes.TEXT,
-            allowNull: false,
+        codigoBloqueo: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
         },
-        notaTecnica: { // Mapea a nota_tecnica
+        estadoPantalla: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        caracteristicasEquipo: {
             type: DataTypes.TEXT,
             allowNull: true,
         },
-
-        // Fechas
-        fechaInicio: { // Mapea a fecha_inicio
-            type: DataTypes.DATEONLY, // Usar DATEONLY para solo guardar la fecha sin hora
-            defaultValue: DataTypes.NOW,
-        },
-        fechaFinalizado: { // Mapea a fecha_finalizado
-            type: DataTypes.DATEONLY,
+        defectosFallas: {
+            type: DataTypes.TEXT,
             allowNull: true,
         },
-
-        // Estado
+        detallesPresupuesto: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        montoAPagar: {
+            type: DataTypes.DECIMAL(12, 2),
+            allowNull: true,
+        },
+        notaTecnica: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
         estado: {
-            type: DataTypes.ENUM('Pendiente', 'Finalizado'),
+            // Actualizado a 4 estados para que coincida con tu flujo solicitado
+            type: DataTypes.ENUM('Pendiente', 'En Reparación', 'Finalizado', 'Entregado'),
             allowNull: false,
             defaultValue: 'Pendiente',
         },
-
-        // Atributos de future-proofing
-        opcion1: { // Mapea a opcion_1
-            type: DataTypes.TEXT,
+        fechaEntrega: {
+            type: DataTypes.DATEONLY,
             allowNull: true,
-        },
-        opcion2: { // Mapea a opcion_2
-            type: DataTypes.TEXT,
-            allowNull: true,
-        },
-        opcion3: { // Mapea a opcion_3
-            type: DataTypes.TEXT,
-            allowNull: true,
-        },
+        }
     },
     {
-        // Opciones del modelo
-        tableName: 'reparaciones', // Asegura que se mapee a la tabla SQL existente
-        timestamps: true, // Agrega createdAt y updatedAt
-        // paranoid: true, // Descomentar si deseas usar soft-deletes (deletedAt)
+        tableName: 'reparaciones',
+        timestamps: true,
     }
 );
 
-// Ejemplo de exportación si usas el patrón de inyección de conexión
-// module.exports = Reparacion; 
-
-// Si usas el patrón de tu ejemplo:
-// const Sequelize = require("..."); // Tu conexión
-// module.exports = Reparacion(Sequelize);
+module.exports = reparacion;

@@ -1,6 +1,6 @@
 const { DataTypes } = require("sequelize");
 // Se ajusta el require para que coincida con la sintaxis de tu index.js
-const SequelizeInstance = require("../../dbconnection/db"); 
+const SequelizeInstance = require("../../dbconnection/db");
 
 // Asegúrate de que tu instancia de Sequelize se pasa correctamente a través del require
 // Si el archivo db.js exporta solo la instancia:
@@ -16,17 +16,15 @@ const RecaudacionFinal = SequelizeInstance.define(
       autoIncrement: true,
       primaryKey: true,
     },
-    // Array for e-commerce payments
-    pagosEcommerce: {
-      type: DataTypes.ARRAY(DataTypes.JSONB),
+    // List of all products sold
+    productosVendidos: {
+      type: DataTypes.JSON,
       allowNull: true,
-      defaultValue: [],
     },
-    // Array for local payments
-    pagosLocal: {
-      type: DataTypes.ARRAY(DataTypes.JSONB),
+    // Month/Year string
+    mes: {
+      type: DataTypes.STRING,
       allowNull: true,
-      defaultValue: [],
     },
     // Final total amount (DECIMAL for precision)
     totalFinal: {
@@ -46,6 +44,19 @@ const RecaudacionFinal = SequelizeInstance.define(
       allowNull: false,
       defaultValue: 0.00,
     },
+    detalles_billetes: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
+    // New field to store cash closure summary (metrics and payment method totals)
+    resumen_cierre: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
+    detalles_vuelto: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
     // Optional string fields
     op1: { type: DataTypes.STRING, allowNull: true },
     op2: { type: DataTypes.STRING, allowNull: true },
@@ -54,8 +65,8 @@ const RecaudacionFinal = SequelizeInstance.define(
   },
   {
     timestamps: true,
-    paranoid: true, 
-    tableName: 'recaudacion_final', 
+    paranoid: true,
+    tableName: 'recaudacion_final',
   }
 );
 

@@ -17,6 +17,11 @@ const ProductBought = Sequelize.define(
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
     },
+    precioCompra: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.00,
+    },
     marca: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -24,6 +29,10 @@ const ProductBought = Sequelize.define(
     categoria: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    codigoBarras: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     cantidad: {
       type: DataTypes.INTEGER,

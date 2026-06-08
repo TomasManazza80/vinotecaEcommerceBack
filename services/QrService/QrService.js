@@ -1,7 +1,15 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const fs = require('fs').promises;
-const path = require('path');
+import * as baileys from '@whiskeysockets/baileys';
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } = baileys;
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+import pino from 'pino';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let sock = null;
 let ultimoQR = null;
@@ -9,14 +17,13 @@ let estado = 'loading';
 let qrAttempts = 0;
 let connectionAttempts = 0;
 const MAX_CONNECTION_ATTEMPTS = 3;
-const MAX_QR_ATTEMPTS = 10; // Límite de intentos de QR
+const MAX_QR_ATTEMPTS = 3;
 let isConnected = false;
 let reconnectTimeout = null;
 
-// Función para limpiar credenciales
 const cleanupAuth = async () => {
     try {
-        const authDir = 'auth_info_baileys';
+        const authDir = path.join(process.cwd(), 'auth_info_baileys');
         try {
             const files = await fs.readdir(authDir);
             for (const file of files) {
@@ -35,20 +42,17 @@ const cleanupAuth = async () => {
     }
 };
 
-const init = async () => {
-    // Limpiar timeout anterior
+export const init = async () => {
     if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;
     }
 
-    // Si ya está conectado, no hacer nada
     if (isConnected && sock) {
         console.log("ℹ️ [WhatsApp] Ya está conectado");
         return;
     }
 
-    // Incrementar intentos de conexión
     connectionAttempts++;
 
     if (connectionAttempts > MAX_CONNECTION_ATTEMPTS) {
@@ -60,16 +64,21 @@ const init = async () => {
     console.log(`🚀 [WhatsApp] Iniciando (Intento conexión ${connectionAttempts}/${MAX_CONNECTION_ATTEMPTS})`);
 
     try {
+        // Obtener la versión más reciente de WA Web para evitar el error 405
+        const { version, isLatest } = await fetchLatestBaileysVersion();
+        console.log(`🔧 [WhatsApp] Usando versión WA Web: ${version.join('.')} | ¿Última? ${isLatest}`);
+
         const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
         sock = makeWASocket({
+            version,
             auth: state,
-            logger: pino({ level: 'silent' }),
-            printQRInTerminal: true,
-            browser: ['Windows', 'Chrome', '120.0.0.0'],
-            connectTimeoutMs: 60000,
+            logger: pino({ level: 'error' }),
+            browser: Browsers.ubuntu('Chrome'),
+            connectTimeoutMs: 90000,
             keepAliveIntervalMs: 10000,
             markOnlineOnConnect: false,
+            printQRInTerminal: true,
         });
 
         sock.ev.on('creds.update', saveCreds);
@@ -77,16 +86,14 @@ const init = async () => {
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
-            // QR disponible
             if (qr) {
                 qrAttempts++;
                 ultimoQR = qr;
                 estado = 'qr';
                 console.log(`📲 [WhatsApp] QR generado (Intento ${qrAttempts}/${MAX_QR_ATTEMPTS})`);
 
-                // Lógica para detener tras 10 intentos de QR
                 if (qrAttempts >= MAX_QR_ATTEMPTS) {
-                    console.log("🛑 [WhatsApp] Límite de 10 QRs alcanzado. Deteniendo servicio para ahorrar recursos.");
+                    console.log("🛑 [WhatsApp] Límite de 3 QRs alcanzado. Deteniendo servicio.");
                     estado = 'max_qr_attempts_reached';
 
                     if (sock) {
@@ -100,7 +107,6 @@ const init = async () => {
                 connectionAttempts = 0;
             }
 
-            // Conexión exitosa
             if (connection === 'open') {
                 isConnected = true;
                 estado = 'connected';
@@ -110,15 +116,20 @@ const init = async () => {
                 console.log("🟢 [WhatsApp] Conectado exitosamente");
             }
 
-            // Conexión cerrada
             if (connection === 'close') {
                 isConnected = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const errorMessage = lastDisconnect?.error?.message;
 
-                console.log(`🔌 [WhatsApp] Desconectado. Código: ${statusCode || 'desconocido'}`);
+                // Log detallado del error de desconexión
+                console.log(`🔌 [WhatsApp] Desconectado. Código: ${statusCode || 'desconocido'} | Mensaje: ${errorMessage || 'sin mensaje'}`);
+                if (lastDisconnect?.error) {
+                    console.log("🔍 [WhatsApp] Detalle del error:", JSON.stringify(lastDisconnect.error, null, 2));
+                }
 
-                if (statusCode === 401 || statusCode === DisconnectReason.loggedOut) {
-                    console.log("🔑 [WhatsApp] Sesión expirada (401). Limpiando...");
+                // 440 suele ser conflicto de sesión o stream. Limpiamos y reintentamos.
+                if (statusCode === 401 || statusCode === 440 || statusCode === DisconnectReason.loggedOut) {
+                    console.log(`🔑 [WhatsApp] Sesión conflictiva (${statusCode}). Limpiando auth...`);
                     estado = 'session_expired';
                     await cleanupAuth();
 
@@ -131,7 +142,7 @@ const init = async () => {
                         sock = null;
                     }
 
-                    console.log("⏳ [WhatsApp] Generando nuevo QR en 3 segundos...");
+                    console.log("⏳ [WhatsApp] Reiniciando en 3 segundos...");
                     reconnectTimeout = setTimeout(async () => {
                         await init();
                     }, 3000);
@@ -155,11 +166,11 @@ const init = async () => {
         });
 
         sock.ev.on('error', (err) => {
-            console.log("❌ [WhatsApp] Error:", err.message);
+            console.log("❌ [WhatsApp] Error de evento:", err.message);
         });
 
     } catch (error) {
-        console.log("❌ [WhatsApp] Error al inicializar:", error.message);
+        console.error("❌ [WhatsApp] Error crítico al inicializar:", error);
         estado = 'error';
         isConnected = false;
 
@@ -171,7 +182,7 @@ const init = async () => {
     }
 };
 
-const getStatus = () => ({
+export const getStatus = () => ({
     qr: ultimoQR,
     status: estado,
     qrAttempts: qrAttempts,
@@ -182,7 +193,7 @@ const getStatus = () => ({
     timestamp: new Date().toISOString()
 });
 
-const restart = async () => {
+export const restart = async () => {
     console.log("♻️ [WhatsApp] Reinicio manual solicitado");
 
     if (reconnectTimeout) {
@@ -202,18 +213,28 @@ const restart = async () => {
         }
     }
 
+    // Reset completo del estado para que siempre se genere un QR nuevo
     qrAttempts = 0;
     connectionAttempts = 0;
     ultimoQR = null;
     estado = 'loading';
+    isConnected = false;
 
-    await delay(2000);
-    await init();
+    // Limpiar auth para forzar nuevo QR
+    console.log("🧹 [WhatsApp] Limpiando credenciales para forzar nuevo QR...");
+    await cleanupAuth();
 
-    return { success: true, message: 'Reinicio iniciado' };
+    try {
+        await delay(2000);
+        await init();
+        return { success: true, message: 'Reinicio iniciado' };
+    } catch (error) {
+        console.error("❌ [WhatsApp] Error durante el reinicio:", error);
+        throw error;
+    }
 };
 
-const disconnect = async () => {
+export const disconnect = async () => {
     if (sock) {
         try {
             console.log("🔌 [WhatsApp] Desconexión manual");
@@ -228,18 +249,30 @@ const disconnect = async () => {
     }
 };
 
-const getSocket = () => sock;
+export const getSocket = () => sock;
 
-const forceCleanup = async () => {
-    return await cleanupAuth();
+export const sendMessage = async (number, message) => {
+    if (!sock || !isConnected) {
+        throw new Error("WHATSAPP_NOT_CONNECTED");
+    }
+
+    // Formatear número: eliminar +, -, espacios
+    let cleanedNumber = number.replace(/\D/g, '');
+
+    // Lógica para Argentina: Si tiene 10 dígitos (ej: 1122334455), le agregamos el 549
+    if (cleanedNumber.length === 10) {
+        cleanedNumber = '549' + cleanedNumber;
+    }
+
+    // Asegurar que termine en @s.whatsapp.net
+    const jid = cleanedNumber.includes('@') ? cleanedNumber : `${cleanedNumber}@s.whatsapp.net`;
+
+    console.log(`📤 [WhatsApp] Enviando mensaje a: ${jid}`);
+
+    await sock.sendMessage(jid, { text: message });
+    return { success: true };
 };
 
-module.exports = {
-    init,
-    getStatus,
-    restart,
-    disconnect,
-    getSocket,
-    forceCleanup,
-    cleanupAuth
+export const forceCleanup = async () => {
+    return await cleanupAuth();
 };

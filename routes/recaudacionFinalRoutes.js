@@ -20,4 +20,7 @@ router.put('/:id', recaudacionFinalController.updateRecaudacion);
 // DELETE /api/recaudacion/:id (Delete/Soft Delete)
 router.delete('/:id', recaudacionFinalController.deleteRecaudacion);
 
+// NUEVO: Verificación de cierres automáticos pendientes
+router.post('/check-pending', recaudacionFinalController.checkPendingClosures);
+
 export default router;

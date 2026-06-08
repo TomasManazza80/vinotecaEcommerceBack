@@ -8,11 +8,10 @@
 import app from "../app.js"; // <-- IMPORT (NO require)
 import debug from "debug";
 import http from "http";
-import { Server } from "socket.io"; // ✅ Importar Socket.io
-import { inicializarWhatsApp } from "../main.js"; // ✅ Importar función de WhatsApp
 
 // ✅ Sequelize debe importarse por defecto (ESM)
 import { Sequelize } from "../models/index.js";
+import { init as initWhatsapp } from "../services/QrService/QrService.js";
 
 /**
  * Get port from environment and store in Express.
@@ -29,44 +28,25 @@ app.set("port", port);
 const server = http.createServer(app);
 
 /**
- * Create Socket.io server.
- */
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-  transports: ['websocket', 'polling']
-});
-
-/**
- * INICIALIZACIÓN DE WHATSAPP
- * Lo movemos fuera de Sequelize.sync para que arranque de inmediato.
- */
-console.log("-------------------------------------------");
-console.log("🚀 [System] Iniciando servicio de WhatsApp...");
-inicializarWhatsApp(io);
-
-/**
  * Listen on provided port, on all network interfaces.
  * Espera a que sequelize sincronice.
  */
 
-Sequelize.sync()
+Sequelize.sync({ alter: true })
   .then(() => {
-    console.log("🟢 [Database] Base de datos sincronizada.");
-
+    console.log("✅ Database synced! Iniciando servidor...");
+    initWhatsapp(); // Inicializa el servicio de WhatsApp
     server.listen(port);
     server.on("error", onError);
     server.on("listening", onListening);
   })
   .catch((error) => {
     // ❌ IMPORTANTE: Mostrar el error de conexión para debugging en Render
-    console.error("❌❌❌ [Database] Error al sincronizar la base de datos:", error);
+    console.error("❌❌❌ ERROR CRÍTICO: Error al sincronizar la base de datos (DB Connection Failed).", error);
 
     // Si la DB falla, por lo menos inicia el servidor para que Render detecte el puerto
     // y puedas debuggear.
-    console.log("⚠️ [Database] Fallo en la DB, pero intentando iniciar el servidor en el puerto: " + port);
+    console.log("⚠️ Fallo en la DB, pero intentando iniciar el servidor en el puerto: " + port);
 
     // Intentamos iniciar el servidor de todas formas, pero es probable que Render crashee
     // si el error es grave y no se maneja bien el process.exit.
@@ -133,6 +113,5 @@ function onListening() {
   const addr = server.address();
   const bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
   debug("backend:server")(`Listening on ${bind}`);
-  console.log(`📡 [Server] Servidor escuchando en ${bind}`); // Log adicional para confirmar en Render
-  console.log("-------------------------------------------");
+  console.log(`✅ Servidor escuchando en ${bind}`); // Log adicional para confirmar en Render
 }

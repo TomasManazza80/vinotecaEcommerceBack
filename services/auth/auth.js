@@ -39,9 +39,9 @@ async function createToken(userData) {
     // Solo incluir datos necesarios en el token
     const payload = {
       email: userData.email,
-      userId: userData.id, // Mejor usar ID que datos sensibles
-      rol: userData.rol
-      // Evita incluir: password, información personal sensible
+      userId: userData.id,
+      role: userData.role,
+      name: userData.name
     };
 
     const token = jwt.sign(payload, JWT_SECRET, {
@@ -68,9 +68,9 @@ async function verifyToken(token) {
   }
 }
 
-module.exports = { 
-  authHash, 
-  createToken, 
+module.exports = {
+  authHash,
+  createToken,
   compareHash,
   verifyToken // Exportamos la nueva función
 };

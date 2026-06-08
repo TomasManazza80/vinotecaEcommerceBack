@@ -1,132 +1,100 @@
-// BACK/controller/reparacionesController.js
+import service from '../services/reparacionesService.js';
+import * as whatsappService from '../services/QrService/QrService.js';
 
-// Importamos las funciones específicas usando destructuring, y la extensión .js es OBLIGATORIA
-import {
-    createReparacionService,
-    getReparacionesService,
-    updateReparacionStatusService,
-    deleteReparacionService,
-} from '../services/reparacionesService.js';
+const reparacionesController = {
+    async create(req, res) {
+        try {
+            const result = await service.create(req.body);
+            res.status(201).json(result);
+        } catch (error) {
+            // Es una buena práctica registrar el error completo en el servidor para depuración
+            console.error("Error al crear la reparación:", error);
 
+            if (error.name === 'SequelizeUniqueConstraintError') {
+                // Esto ocurre si un campo único (como numeroOrden) se duplica.
+                // 409 Conflict es un código de estado más apropiado.
+                const field = error.errors[0].path;
+                return res.status(409).json({
+                    error: `El valor para '${field}' ya existe. Por favor, usa uno diferente.`
+                });
+            }
+            if (error.name === 'SequelizeValidationError') {
+                // Esto ocurre si faltan campos requeridos (allowNull: false) o los datos no son válidos.
+                const messages = error.errors.map(err => err.message);
+                return res.status(400).json({ error: "Datos inválidos o faltantes", details: messages });
+            }
 
-/**
- * Maneja la creación de un nuevo registro de reparación (POST /).
- */
-const createReparacion = async (req, res) => {
-    try {
-        const data = req.body;
-        
-        // Validación de campos obligatorios
-        if (!data.nombreDueno || !data.celular || !data.nombreDispositivo || !data.descripcionProblema) {
-            return res.status(400).json({ 
-                error: 'Faltan campos obligatorios: dueño, celular, dispositivo o problema.' 
-            });
+            // Para cualquier otro tipo de error, es mejor un 500 Internal Server Error.
+            res.status(500).json({ error: "Ocurrió un error en el servidor." });
         }
+    },
 
-        const nuevaReparacion = await createReparacionService(data);
-        
-        res.status(201).json({ 
-            message: 'Reparación cargada con éxito.', 
-            data: nuevaReparacion 
-        });
+    async getAll(req, res) {
+        try {
+            const { startDate, endDate } = req.query;
+            const data = await service.getAll(startDate, endDate);
+            res.json(data);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    },
 
-    } catch (error) {
-        console.error('Error en createReparacion:', error.message);
-        res.status(500).json({ 
-            error: 'Error interno al cargar la reparación', 
-            details: error.message 
-        });
+    async update(req, res) {
+        try {
+            const result = await service.update(req.params.id, req.body);
+            res.json(result);
+        } catch (error) {
+            res.status(400).json({ error: error.message });
+        }
+    },
+
+    async updateStatus(req, res) {
+        try {
+            const { estado, ...additionalData } = req.body;
+            const result = await service.updateStatus(req.params.id, estado, additionalData);
+            res.json(result);
+        } catch (error) {
+            res.status(400).json({ error: error.message });
+        }
+    },
+
+    async delete(req, res) {
+        try {
+            await service.delete(req.params.id);
+            res.sendStatus(204);
+        } catch (error) {
+            res.status(400).json({ error: error.message });
+        }
+    },
+
+    async notifyClient(req, res) {
+        try {
+            const item = await service.getById(req.params.id);
+            if (!item) return res.status(404).json({ error: 'REPARACION_NO_ENCONTRADA' });
+
+            if (!item.celular) {
+                return res.status(400).json({ error: 'EL_CLIENTE_NO_TIENE_CELULAR_REGISTRADO' });
+            }
+
+            const nombre = item.nombreDueno || 'Cliente';
+            const equipo = item.modeloEquipo || 'Equipo en reparación';
+            const monto = item.montoAPagar ? `$${parseFloat(item.montoAPagar).toLocaleString()}` : 'Presupuesto pendiente';
+
+            const message = `*EQUITOP - Servicio Técnico* 📱\n\n` +
+                `Hola *${nombre}* 👋, te informamos que tu equipo ya está listo para ser retirado!\n\n` +
+                `*Detalles de la reparación:*\n` +
+                `🛠️ *Equipo:* ${equipo}\n` +
+                `📑 *Orden:* #${item.numeroOrden}\n` +
+                `💰 *Total a abonar:* ${monto}\n\n` +
+                `¡Te esperamos en el local! 🤝✨`;
+
+            await whatsappService.sendMessage(item.celular, message);
+            res.json({ success: true, message: 'Notificación enviada' });
+        } catch (error) {
+            console.error("ERROR_NOTIFYING_WHATSAPP", error);
+            res.status(500).json({ error: error.message === 'WHATSAPP_NOT_CONNECTED' ? 'WhatsApp no está conectado' : 'Error al enviar mensaje' });
+        }
     }
 };
 
-/**
- * Maneja la obtención de todas las reparaciones (GET /).
- */
-const getReparaciones = async (req, res) => {
-    const { estado } = req.query; 
-    
-    try {
-        const reparaciones = await getReparacionesService(estado);
-        
-        res.status(200).json(reparaciones);
-
-    } catch (error) {
-        console.error('Error en getReparaciones:', error.message);
-        res.status(500).json({ 
-            error: 'Error interno al obtener las reparaciones', 
-            details: error.message 
-        });
-    }
-};
-
-/**
- * Maneja la actualización del estado de una reparación (PATCH /:id/status).
- */
-const updateReparacionStatus = async (req, res) => {
-    const { id } = req.params;
-    const { newStatus, notaTecnica } = req.body;
-
-    try {
-        // Validación de estado
-        if (!newStatus || !['Pendiente', 'Finalizado'].includes(newStatus)) {
-            return res.status(400).json({ 
-                error: 'Estado de actualización no válido. Debe ser "Pendiente" o "Finalizado".' 
-            });
-        }
-
-        const result = await updateReparacionStatusService(id, newStatus, notaTecnica);
-        
-        res.status(200).json({
-            message: `Reparación ${id} actualizada a estado: ${newStatus}`,
-            data: result
-        });
-
-    } catch (error) {
-        console.error('Error en updateReparacionStatus:', error.message);
-        
-        // Manejo específico para ID no encontrado (Error 404)
-        if (error.message.includes('no encontrada')) {
-            return res.status(404).json({ error: error.message });
-        }
-        
-        res.status(500).json({ 
-            error: 'Error interno al actualizar el estado de la reparación', 
-            details: error.message 
-        });
-    }
-};
-
-/**
- * Maneja la eliminación de una reparación (DELETE /:id).
- */
-const deleteReparacion = async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        await deleteReparacionService(id);
-        
-        res.status(200).json({
-            message: `Reparación ID ${id} eliminada con éxito.`,
-        });
-
-    } catch (error) {
-        console.error('Error en deleteReparacion:', error.message);
-        
-        if (error.message.includes('no encontrada')) {
-            return res.status(404).json({ error: error.message });
-        }
-
-        res.status(500).json({ 
-            error: 'Error interno al eliminar la reparación', 
-            details: error.message 
-        });
-    }
-};
-
-// Exportación por defecto del objeto de controladores
-export default {
-    createReparacion,
-    getReparaciones,
-    updateReparacionStatus,
-    deleteReparacion,
-};
+export default reparacionesController;

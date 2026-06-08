@@ -1,14 +1,14 @@
 // BACK/app.js (versión ES Modules - Exporta 'app')
 
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 import createError from 'http-errors';
 import express from 'express';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import logger from 'morgan';
 import cors from 'cors';
-import whatsappEnvioRoutes from './routes/whatsapp/enviarMensajeWhatsapp.js';
-import qrRoutes from './routes/QRroutes/qrRoutes.js';
+import cron from 'node-cron';
 
 // Rutas
 import indexRouter from './routes/index.js';
@@ -20,11 +20,26 @@ import productBought from './routes/productBoughtRoute.js';
 import recaudationRouter from './routes/recaudationRoutes.js';
 import pagoCaja from './routes/pagoCajaRoutes.js';
 import recaudacionFinalRouter from './routes/recaudacionFinalRoutes.js';
-import costosEnvioRouter from './routes/costosEnvioRoutes.js';
-import costoTargetasRouter from './routes/costoTargetasRoutes.js';
-import globalSettingsRouter from './routes/costosGlobalesRoutes.js';
+import balanceMensualRouter from './routes/balance/balanceMensualRoutes.js';
+import egresosRouter from './routes/balance/egresosRoutes.js';
+import balancePersonalRouter from './routes/balance/balancePersonalRoutes.js';
+import gastosMensualesRouter from './routes/balance/gastosMensualesRoutes.js';
+import deudaPersonalRouter from './routes/balance/deudaPersonalRoutes.js';
+import contenidoRouter from './routes/cargaDeContenidoRoutes/contenidoRoutes.js';
+import devolucionProductosRouter from './routes/devolucionProductos/devolucionProductosRoutes.js';
+import remitoRouter from './routes/remito/remitoRoutes.js';
+import gastosRouter from './routes/gastosRoutes.js';
+import qrRouter from './routes/QRroutes/qrRoutes.js';
+import ventasEcommerceRouter from './routes/ventasEcommerce/ventasEcommerceRoutes.js';
+import reportRouter from './routes/reportRoutes.js';
+import clientRouter from './routes/clientRoutes.js';
+import imagekitRouter from './routes/imagekitRoutes.js';
+import categoryRouter from './routes/categoryRoutes.js';
+import providerRouter from './routes/providerRoutes.js';
+import successCasesRouter from './routes/successCase/successCaseRoutes.js';
 
-
+// Servicios
+import cierreCajaService from './services/cierreCajaService.js';
 
 // Vexor: CORRECCIÓN FINAL DE IMPORTACIÓN
 // Esto resuelve: TypeError: Vexor is not a constructor
@@ -37,9 +52,11 @@ const Vexor = vexorModule.Vexor || vexorModule.default || vexorModule;
 
 dotenv.config();
 
+// Para ES Modules, esta es la forma correcta de obtener __dirname
+const __filename = fileURLToPath(import.meta.url);
 // Para ES Modules (equivalente a __dirname)
 // Nota: path.dirname(new URL(import.meta.url).pathname) requiere el protocolo 'file://'
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -56,27 +73,59 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Middlewares
 app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Se reduce el límite global a un valor más seguro.
+// Rutas específicas que necesiten más (ej. carga de archivos) deben manejarlo individualmente.
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: false, limit: '5mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
-
+app.use('/egresos', egresosRouter);
 // Rutas
+console.log("SERVER_INIT: Registering middleares and routes...");
 app.use('/', indexRouter);
 app.use('/', usersRouter);
 app.use('/', productRouter);
+app.use('/ecommerce', ventasEcommerceRouter);
 app.use('/payment', paymentRouter);
 app.use('/boughtProduct', productBought);
 app.use('/recaudation', recaudationRouter);
 app.use('/reparaciones', reparacionesRouter);
 app.use('/pagoCaja', pagoCaja);
 app.use('/recaudacionFinal', recaudacionFinalRouter);
-app.use('/costosEnvio', costosEnvioRouter);
-app.use('/costoTargetas', costoTargetasRouter);
-app.use('/globalSettings', globalSettingsRouter);
-app.use('/whatsappEnvio', whatsappEnvioRoutes);
-app.use('/qr', qrRoutes);
+app.use('/balanceMensual', balanceMensualRouter);
+app.use('/balancePersonal', balancePersonalRouter);
+app.use('/gastosMensuales', gastosMensualesRouter);
+app.use('/deudaPersonal', deudaPersonalRouter);
+app.use('/contenido', contenidoRouter);
+app.use('/devolucionProductos', devolucionProductosRouter);
+app.use('/remito', remitoRouter);
+app.use('/gastos', gastosRouter);
+app.use('/qr', qrRouter);
+app.use('/reports', reportRouter);
+app.use('/api/auth/imagekit', imagekitRouter);
+app.use('/', clientRouter);
+app.use('/api/categories', categoryRouter);
+app.use('/', providerRouter);
+
+app.use('/success-cases', successCasesRouter);
+
+// --- PROGRAMACIÓN DE TAREAS (CRON JOBS) ---
+// Cierre automático de caja a las 23:00 hrs (solo si AUTO_ACTIV está activado)
+cron.schedule('00 23 * * *', async () => {
+    try {
+        const { GlobalConfig } = await import('./models/index.js');
+        const autoActivo = await GlobalConfig.findOne({ where: { key: 'equitop_auto_cierre_activado' } });
+        if (autoActivo?.value === 'true') {
+            console.log('[CRON] AUTO_ACTIV detectado, ejecutando cierre de caja...');
+            await cierreCajaService.ejecutarCierreAutomatico({ forceToday: true });
+        } else {
+            console.log('[CRON] AUTO_ACTIV no está activado, se omite el cierre automático.');
+        }
+    } catch (err) {
+        console.error('[CRON_ERROR] Error al verificar AUTO_ACTIV:', err);
+    }
+}, { timezone: "America/Argentina/Buenos_Aires" });
 
 // Catch 404
 app.use((req, res, next) => {
