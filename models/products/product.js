@@ -59,6 +59,28 @@ const Product = Sequelize.define("product", {
     allowNull: true,
     defaultValue: null,
   },
+  // --- COLUMNAS TEMPORALES (PARA EVITAR DROP AL RESTAURAR) ---
+  cantidad: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  precioVenta: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  precioCompra: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  precioMayorista: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  precioRevendedor: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  // -------------------------------------------------------------
   // Información Adicional
   descripcion: {
     type: DataTypes.TEXT,

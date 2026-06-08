@@ -59,8 +59,9 @@ if (process.env.DATABASE_URL) {
 
     // 🔥 ESTA LÍNEA REPARA EL ERROR DE LAS COLUMNAS FALTANTES
     // Detecta que falta 'proveedorOrigen', 'fechaActualizacion', etc., y las crea.
-    await sequelize.sync({ alter: true });
-    console.log('✨ Base de datos sincronizada: Columnas actualizadas correctamente.');
+    // MODIFICADO: alter: { drop: false } asegura que NUNCA se borren columnas o datos existentes.
+    await sequelize.sync({ alter: { drop: false } });
+    console.log('✨ Base de datos sincronizada: Columnas actualizadas correctamente. No se borraron datos.');
 
     const [result] = await sequelize.query('SELECT version() as postgres_version');
     console.log(`🔍 Versión de PostgreSQL: ${result[0].postgres_version}`);
